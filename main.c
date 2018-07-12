@@ -2,19 +2,22 @@
 #include <stdlib.h>
 #include <math.h>
 
-#pragma pack(1)
+#pragma pack(1)	// 構造体のメモリを詰める
+// STL Header
 typedef struct{
 	unsigned char ucHeader[80];
 	unsigned int  uiTriangleNum;
 
 }T_Header;
 
+// STL Data (single triangle)
 typedef struct{
 	float fNormalVector[3];
 	float fCordinate[3][3];
 	unsigned char ucUnused[2];
 }T_Data;
 
+// PCD Data (single point)
 typedef struct{
 	float fCordinate[3];
 }T_PCD_Data;
@@ -38,6 +41,7 @@ void prinptData(T_Data ptData){
 	printf("\n");
 }
 
+// 長さ
 float calcLength(float fVector[3]){
 	float fRet = 0;
 	for(int i=0; i<3; i++){
@@ -46,6 +50,7 @@ float calcLength(float fVector[3]){
 	return sqrt(fRet);
 }
 
+// 外積
 float calcArea(float fVectorA[3], float fVectorB[3]){
 	float fRet[3]={0,0,0};
 	for(int i=0; i<3; i++){
@@ -73,6 +78,7 @@ int main(int argc, char *argv[]){
 	float fDenLen;
 	char ascFileName[50];
 
+	// Open STL file
 	sprintf(ascFileName,"%s.stl",argv[1]);
 	fp = fopen(ascFileName , "rb" );
 	if( fp == NULL ){
@@ -82,6 +88,7 @@ int main(int argc, char *argv[]){
 		printf("File '%s' was opened.\n", ascFileName);
 	}
 
+	// Load Header
 	if( fread(&tHeader, sizeof(tHeader), 1, fp ) < 1 ){
 		fputs( "Header read error.\n", stderr );
 		exit( EXIT_FAILURE );
@@ -92,6 +99,7 @@ int main(int argc, char *argv[]){
 	printf("sizeof header: %d\n",(int)sizeof(tHeader));
 	printf("Triangle Number: %d\n",tHeader.uiTriangleNum);
 
+	// Load Data
 	ptData = malloc(sizeof(T_Data) * tHeader.uiTriangleNum);
 	if( fread(ptData, sizeof(T_Data), tHeader.uiTriangleNum, fp ) < 1 ){
 		fputs( "Data read error.\n", stderr );
@@ -106,21 +114,26 @@ int main(int argc, char *argv[]){
 	}
 	fclose(fp);
 
-
+	// Calculate Point cloud from STL
 	unsigned int uiCountMax = 1000000;
 	unsigned int uiCount = 0;
 	T_PCD_Data *ptPCDData;
 	ptPCDData = malloc(sizeof(T_PCD_Data) * uiCountMax);
 
 	for(int i=0; i<tHeader.uiTriangleNum; i++){
+		// Two vectors on Triangle plane
 		for(int j=0; j<3; j++){
 			fA[j] = ptData[i].fCordinate[1][j] - ptData[i].fCordinate[0][j];
 			fB[j] = ptData[i].fCordinate[2][j] - ptData[i].fCordinate[0][j];
 		}
+
+		// Calculate Unit vectors
 		for(int j=0; j<3; j++){
 			fAUnit[j] = fA[j]/calcLength(fA);
 			fBUnit[j] = fB[j]/calcLength(fB);
 		}
+
+		// Calculate Lattice points in Triangle
 		fDenLen = sqrt(2*fSUnit/calcArea(fA,fB));
 		for(float a=0; a <= calcLength(fA); a+=fDenLen){
 			for(float b=0; b <= calcLength(fB); b+=fDenLen){
@@ -142,6 +155,7 @@ int main(int argc, char *argv[]){
 		}
 	}
 
+	// Export PCD
 	FILE *fpExp;
 	sprintf(ascFileName,"%s.pcd",argv[1]);
 	fpExp = fopen(ascFileName, "wb");
@@ -151,6 +165,7 @@ int main(int argc, char *argv[]){
 	fwrite(ptPCDData, sizeof(ptPCDData), uiCount, fpExp);
 	fclose(fpExp);
 
+	// Export ASCII
 	sprintf(ascFileName,"%s.asc",argv[1]);
 	fpExp = fopen(ascFileName, "wb");
 	for(int i=0; i<uiCount; i++){
