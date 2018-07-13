@@ -68,15 +68,25 @@ float calcArea(float fVectorA[3], float fVectorB[3]){
 //}
 
 int main(int argc, char *argv[]){
-	printf("Start STL2PCD Converter\n");
 	FILE* fp;
 	T_Header tHeader;
 	T_Data *ptData;
-	float fA[3], fAUnit[3], fATemp[3];
-	float fB[3], fBUnit[3], fBTemp[3];
+	float fA[3], fAUnit[3];
+	float fB[3], fBUnit[3];
 	float fSUnit = 100;
 	float fDenLen;
 	char ascFileName[50];
+	unsigned int uiCountMax = 1000000;
+	unsigned int uiCount = 0;
+	T_PCD_Data *ptPCDData;
+
+	if(argc != 2){
+		printf("Error. Invalid argument.\n");
+		printf("%s 'File Name' \n", argv[0]);
+		return 0;
+	}else{
+		printf("Start STL2PCD Conversion.\n");
+	}
 
 	// Open STL file
 	sprintf(ascFileName,"%s.stl",argv[1]);
@@ -84,42 +94,34 @@ int main(int argc, char *argv[]){
 	if( fp == NULL ){
 		fputs( "File could not open.\n", stderr );
 		exit( EXIT_FAILURE );
-	}else{
-		printf("File '%s' was opened.\n", ascFileName);
 	}
 
 	// Load Header
 	if( fread(&tHeader, sizeof(tHeader), 1, fp ) < 1 ){
 		fputs( "Header read error.\n", stderr );
 		exit( EXIT_FAILURE );
-	}else{
-		printf("Header was loded.\n");
 	}
-
-	printf("sizeof header: %d\n",(int)sizeof(tHeader));
-	printf("Triangle Number: %d\n",tHeader.uiTriangleNum);
 
 	// Load Data
 	ptData = malloc(sizeof(T_Data) * tHeader.uiTriangleNum);
 	if( fread(ptData, sizeof(T_Data), tHeader.uiTriangleNum, fp ) < 1 ){
 		fputs( "Data read error.\n", stderr );
 		exit( EXIT_FAILURE );
-	}else{
-		printf("Data was loded.\n");
 	}
 
-	printf("sizeof data: %d\n",(int)sizeof(ptData));
+//	printf("Header size: %d\n",(int)sizeof(tHeader));
+//	printf("Single data size: %d\n",(int)sizeof(ptData));
+	printf("Number of Triangles: %d\n\n",tHeader.uiTriangleNum);
+
+	printf("Triangle Data\n");
 	for(int i=0; i<tHeader.uiTriangleNum; i++){
 		prinptData(ptData[i]);
 	}
+
 	fclose(fp);
 
 	// Calculate Point cloud from STL
-	unsigned int uiCountMax = 1000000;
-	unsigned int uiCount = 0;
-	T_PCD_Data *ptPCDData;
 	ptPCDData = malloc(sizeof(T_PCD_Data) * uiCountMax);
-
 	for(int i=0; i<tHeader.uiTriangleNum; i++){
 		// Two vectors on Triangle plane
 		for(int j=0; j<3; j++){
@@ -137,14 +139,12 @@ int main(int argc, char *argv[]){
 		fDenLen = sqrt(2*fSUnit/calcArea(fA,fB));
 		for(float a=0; a <= calcLength(fA); a+=fDenLen){
 			for(float b=0; b <= calcLength(fB); b+=fDenLen){
-				for(int j=0; j<3; j++){
-					fATemp[j] = a * fAUnit[j];
-					fBTemp[j] = b * fBUnit[j];
-				}
+				// Inside triangle condition
 				if(a/calcLength(fA) + b/calcLength(fB) <= 1){
 					for(int j=0; j<3; j++){
-						ptPCDData[uiCount].fCordinate[j] = ptData[i].fCordinate[0][j] + fATemp[j] + fBTemp[j];
+						ptPCDData[uiCount].fCordinate[j] = ptData[i].fCordinate[0][j] + a * fAUnit[j] + b * fBUnit[j];
 					}
+
 					uiCount++;
 					if(uiCount > uiCountMax){
 						fputs( "Over max point amount\n", stderr );
@@ -174,5 +174,5 @@ int main(int argc, char *argv[]){
 	fclose(fpExp);
 
 	free(ptData);
-
+	free(ptPCDData);
 }
